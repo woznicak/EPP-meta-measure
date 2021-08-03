@@ -5,15 +5,15 @@ library(dplyr)
 library(scales)
 
 data_path <- "./data/elo_results_6_models_400_params/"
-list_files <- list.files(data_path)
+list_files <- list.files(data_path, pattern = '.csv')
 
 dst_num <- gsub(pattern = '[^0-9]', replacement = '', x = list_files)
 
 ## get OpenML names
 dst <- sapply(dst_num, function(x) getOMLDataSet(as.numeric(x))$desc$name)
 
-p_model <- readRDS('.data/epp_openml_glm_models.Rd')
-names(p_model) <- list.files(pattern = '^elo_[0-9].+Rd$')
+p_model <- readRDS('data/elo_results_6_models_400_params/Rd_files/epp_openml_glm_models.Rd')
+names(p_model) <- list.files(data_path, pattern = '^elo_[0-9].+csv$')
 
 ### check that every dataset has 6 algorithms - not at index 31 - we have to remove that
 which(sapply(lapply(p_model, function(x) unique(gsub(pattern = '_[0-9]+', replacement = '', rownames(coefficients(x))))), length) != 6)
@@ -40,43 +40,28 @@ idx_worst <- which.max(deviance_epp)
 name_worst <- dst[idx_worst]
 selected_datasets <- c(names(idx_best), names(idx_worst))
 
-selected_files <- lapply(selected_datasets, readRDS)
+## load all data for the best and the worst dataset
+selected_files <- lapply(c('data/elo_results_6_models_400_params/Rd_files/elo_1510.Rd',
+                           'data/elo_results_6_models_400_params/Rd_files/elo_1467.Rd'), readRDS)
 
-EloML::plot_wins_ratio()
+actual_score_worst <- EloML::plot_wins_ratio(selected_files[[2]],random_sample = 0.3, random_state = 123)
+actual_score_best <- EloML::plot_wins_ratio(selected_files[[1]],random_sample = 0.3, random_state = 123)
 
-### draw plot_wins_ratio for random sample 
-sample_random_epp <- function(epp, seed = 123, name){
-  set.seed(seed)
-  sample_model <- sample(epp$elo$model, size = floor(0.3 * length(epp$elo$model)))
-  
-  actual_score <- epp$actual_score[epp$actual_score$winner %in% sample_model & epp$actual_score$loser %in% sample_model,] 
-  epp_score <- epp$elo[epp$elo$model %in% sample_model, ]
-  actual_score[["ratio"]] <- actual_score[["wins"]] / actual_score[["match"]]
-  actual_score <- merge(actual_score, epp_score, by.x ="winner", by.y = "model")
-  names(actual_score)[names(actual_score)=='epp'] <- "epp_winner"
-  actual_score <- merge(actual_score, epp_score, by.x ="loser", by.y = "model")
-  names(actual_score)[names(actual_score)=='epp'] <- "epp_loser"
-  actual_score[['pred_ratio']] <- exp(actual_score[["epp_winner"]] - actual_score[['epp_loser']])/(1+exp(actual_score[["epp_winner"]] - actual_score[['epp_loser']]))
-  actual_score[['algorithm']] <- gsub(pattern = '_[0-9]+', replacement = '', actual_score[['winner']])
-  
-  ## rename dataset
-  actual_score[['dataset']] <- name
-  
-  return(actual_score)
-}
+## extract data to plot and rbind
+data_actual_score_worst <- actual_score_worst$data
+data_actual_score_worst[['algorithm']] <- gsub(pattern = '_[0-9]+', replacement = '', data_actual_score_worst[['winner']])
+data_actual_score_worst[['dataset']] <- name_worst
 
+data_actual_score_best <- actual_score_best$data
+data_actual_score_best[['algorithm']] <- gsub(pattern = '_[0-9]+', replacement = '', data_actual_score_best[['winner']])
+data_actual_score_best[['dataset']] <- name_best
 
-# for two datasets
-
-
-actual_score_worst <- sample_random_epp(epp = selected_files[[2]], name = name_worst)
-actual_score_best <- sample_random_epp(epp = selected_files[[2]], name = name_best)
 
 
 ## rbind results for these datasets
 
-actual_score_bind <- rbind(actual_score_worst, actual_score_best)
-actual_score_bind[['algorithm']] <- gsub('randomForest', 'RF', actual_score_bind[['algorithm']])
+actual_score_bind <- rbind(data_actual_score_worst, data_actual_score_best)
+actual_score_bind[['algorithm']] <- gsub('randomForest', 'RF', actual_score_bind[['players']])
 
 p_best <- ggplot(actual_score_bind, aes(x=ratio, y = pred_ratio, color  = algorithm))+
   geom_point(alpha = 0.2)+

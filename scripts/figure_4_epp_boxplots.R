@@ -6,7 +6,7 @@ library(OpenML)
 library(xtable)
 
 data_path <- "./data/elo_results_6_models_400_params/"
-list_files <- list.files(data_path)
+list_files <- list.files(data_path, pattern = '.csv')
 
 elo <- data.frame()
 for(file in list_files){
@@ -25,16 +25,16 @@ swr = function(string, nwrap=20) {
 }
 swr = Vectorize(swr)
 elo$name_format <- swr(gsub('-', ' ', elo$name))
-elo$model <- gsub("randomForest", "RF", elo$model)
+elo$player <- gsub("randomForest", "RF", elo$player)
 
 
 
 elo %>% 
-  select(dataset,name_format, model, epp) %>% 
+  select(dataset,name_format, player, epp) %>% 
   unique() %>% 
   mutate(dataset= as.character(dataset)) %>% 
-  mutate(model_type =  gsub(pattern = '[_0-9]+', replacement = '', model)) %>% 
-  ggplot(aes(x = model_type, y = epp, fill =model_type))+
+  mutate(player_type =  gsub(pattern = '[_0-9]+', replacement = '', player)) %>% 
+  ggplot(aes(x = player_type, y = epp, fill =player_type))+
   geom_boxplot()+
   coord_flip()+
   facet_wrap(~name_format, ncol = 4)+
